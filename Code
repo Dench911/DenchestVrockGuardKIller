@@ -1,0 +1,221 @@
+package scripts;
+
+import java.awt.Color;
+import java.awt.Graphics;
+
+import org.tribot.api.Clicking;
+import org.tribot.api.General;
+import org.tribot.api.Timing;
+import org.tribot.api.input.Mouse;
+import org.tribot.api2007.Banking;
+import org.tribot.api2007.Camera;
+import org.tribot.api2007.ChooseOption;
+import org.tribot.api2007.GameTab;
+import org.tribot.api2007.Inventory;
+import org.tribot.api2007.NPCs;
+import org.tribot.api2007.PathFinding;
+import org.tribot.api2007.Player;
+import org.tribot.api2007.Skills;
+import org.tribot.api2007.types.RSNPC;
+import org.tribot.api2007.types.RSTile;
+import org.tribot.script.Script;
+import org.tribot.script.ScriptManifest;
+import org.tribot.script.interfaces.Painting;
+
+
+
+@ScriptManifest(authors = { "Too_Dench" }, category = "Combat", name = "DenchestVrockGuardKiller")
+public class DenchestVRockGuardKiller extends Script implements Painting{
+  
+	private RSTile Bank1 = new RSTile(3253,3421);
+	private RSTile Guards1 = new RSTile(3269,3429);
+	private int Guard_NPC_ID = 5919;
+	private int Guard_NPC_ID2 = 5920;
+	
+	
+	private State CURRENT_STATE = getState();
+    private enum State {
+        WALKING_TO_GUARDS, WALKING_TO_BANK, ATTACKING_GUARDS, GETTING_FOOD, EATING_FOOD
+    }
+    
+	public void GoToBank1(){
+		PathFinding.aStarWalk(Bank1);
+		waitNotMoving();
+		isInsideBank();
+	}
+	public boolean eatfood(){
+		if (Skills.getActualLevel("CONSTITUION") <= (General.random(11, 16))){
+			if(Inventory.open() == false)
+				Inventory.open();
+			Inventory.getCount(333,329,361,371,373,385);
+			Inventory.find(333,329,361,371,373,385);
+			ChooseOption.getOptions();
+			ChooseOption.select("Eat");
+			AttackGuard();
+			if(Inventory.getCount(333,329,361,371,373,385) == 0){
+				GoToBank1();
+			}
+			
+		}
+		return true;
+	}
+    
+	public void GoToGuards1(){
+		if(Inventory.getCount(333,329,361,371,373,385) >= 20 && Banking.isBankScreenOpen() == true){
+			Banking.close();
+		}
+		if(Inventory.getCount(333,329,361,371,373,385) >= 20){
+			if(Player.getPosition() == Guards1){
+				AttackGuard();
+			}
+		else if(Player.getPosition() == Guards1 && Inventory.getCount(333,329,361,371,373,385) >= 20){
+				AttackGuard();
+		}
+		else{
+			if(PathFinding.isTileWalkable(Guards1) == true){
+					PathFinding.aStarWalk(Guards1);
+					Player.getPosition();	
+			}
+		}
+		if(Inventory.isFull() == true){
+				AttackGuard();
+		}
+		else if(PathFinding.isTileWalkable(Guards1) && Inventory.getCount(333,329,361,371,373,385) >= 20){
+			PathFinding.aStarWalk(Guards1);
+			Player.getPosition();	
+			}		
+		}		
+	}
+	
+    private void waitNotMoving() {
+        sleep(100, 200);
+        while (Player.isMoving())
+            sleep(50, 100);
+    }
+	private boolean AttackGuard() {
+		if (Skills.getActualLevel("CONSTITUION") <= 15){
+			eatfood();
+		}
+        RSNPC[] Guard2 = NPCs.findNearest(Guard_NPC_ID);
+        RSNPC[] Guard1 = NPCs.findNearest(Guard_NPC_ID2);
+        int Rand = (General.random(1, 2));
+        if (Guard2.length > 0 && Rand == 1 ) {
+        	Clicking.click("Attack", Guard2);
+        }else if(Guard1.length > 0 && Rand == 2) {
+        	Clicking.click("Attack", Guard1);
+        }
+        else {
+            if (Camera.getCameraRotation() > 10 && Camera.getCameraRotation() < 350)
+                Camera.setCameraRotation(General.random(-8, 8));
+            antiban();
+        }
+		return true;
+	}
+	
+    private void antiban() {
+        if (General.random(1, 500) == 1) {
+            Camera.setCameraRotation(General.random(-360, 360));
+        }
+        if(General.random(1, 400) == 1){
+            GameTab.open(GameTab.TABS.STATS);
+            sleep(700,1100);
+            GameTab.open(GameTab.TABS.INVENTORY);
+        }
+    }
+
+	private int banker_ID = 5912;
+    private boolean isInsideBank() {
+    	if(Inventory.getCount(333,329,361,371,373,385) >= 20){
+    		
+    	}
+    	RSNPC[] Banker = NPCs.findNearest(banker_ID);
+        if (Banker.length > 0) {
+            GameTab.open(GameTab.TABS.INVENTORY);
+            Banking.openBankBooth();
+            sleep(700, 1100);
+            if (Banking.isBankScreenOpen() == true){
+            	Banking.getAll()[0].click("Withdraw all"); 
+            	GoToGuards1();
+            }
+        } else {
+            if (Camera.getCameraRotation() > 10 && Camera.getCameraRotation() < 350)
+                Camera.setCameraRotation(General.random(-8, 8));
+        }
+		return true;
+    }
+    
+    private State getState() {
+        if (isInsideBank() == true)
+            if (Inventory.isFull() == false)
+                return State.GETTING_FOOD;
+            else
+                return State.WALKING_TO_GUARDS;
+
+        if (Inventory.isFull() == true)
+            return State.WALKING_TO_GUARDS;
+        if (AttackGuard() == true)
+        	return State.ATTACKING_GUARDS;
+        if (eatfood() == true )
+        	return State.EATING_FOOD;
+		return CURRENT_STATE;
+    }
+	
+	@Override
+	public void run() {
+	     Mouse.setSpeed(General.random(190, 200));
+	     Camera.setCameraAngle(100);
+		
+		while(true){
+			CURRENT_STATE = getState();
+			switch (CURRENT_STATE) {
+				case ATTACKING_GUARDS:
+					AttackGuard();
+					break;
+					
+				case EATING_FOOD:
+					eatfood();
+					break;
+					
+				case WALKING_TO_BANK:
+					GoToBank1();
+					antiban();
+					break;
+					
+				case WALKING_TO_GUARDS:
+					GoToGuards1();
+					antiban();
+					break;
+					
+				case GETTING_FOOD:
+					isInsideBank();
+					break;
+					
+			}
+		}
+		
+	}
+	
+	private int startXP;
+
+
+    @Override
+    public void onPaint(Graphics g) {
+        g.setColor(new Color(145, 145, 145));
+        g.setColor(Color.WHITE);
+        textShadow(g, "Denchest Varrock East Guard Killer", 10, 70);
+        textShadow(g, "State: " + CURRENT_STATE, 10, 90);
+        textShadow(g, "Runtime: " + Timing.msToString(getRunningTime()), 10, 110);
+
+        int xpGained = Skills.getXP("Strength") - startXP;
+        textShadow(g, "XP Gained: " + xpGained, 10, 130);
+
+    }
+
+    private void textShadow(Graphics g, String text, int x, int y) {
+        g.setColor(Color.BLACK);
+        g.drawString(text, x + 1, y + 1);
+        g.setColor(Color.WHITE);
+        g.drawString(text, x, y);
+    }
+	
+}
